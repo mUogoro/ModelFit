@@ -1,3 +1,4 @@
+#include <cstring>
 #include "renderer/geometry/bone_info.h"
 #include "math/math_types.h"
 #include "data_str/pair.h"

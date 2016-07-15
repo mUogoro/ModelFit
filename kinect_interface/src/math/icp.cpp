@@ -732,8 +732,13 @@ namespace math {
   double ICP<T>::testJacobFunc() {
     MERSINE_TWISTER_ENG eng;
     eng.seed(1000);
+#ifdef GCC
+    std::uniform_real_distribution<double> dist(-0.99, +0.99);
+    std::uniform_int_distribution<uint32_t> npts_dist(3, 10);
+#else
     std::tr1::uniform_real_distribution<double> dist(-0.99, +0.99);
     std::tr1::uniform_int_distribution<uint32_t> npts_dist(3, 10);
+#endif //GCC
 
     const uint32_t num_point_clouds = 10;
     const uint32_t num_evals = 1000;

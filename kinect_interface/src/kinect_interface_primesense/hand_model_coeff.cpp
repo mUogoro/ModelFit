@@ -4,6 +4,7 @@
 //  Created by Jonathan Tompson on 8/17/12.
 //
 
+#include <cstring>
 #include <random>
 #include <thread>
 #include <iostream>

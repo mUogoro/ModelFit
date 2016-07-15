@@ -1,4 +1,5 @@
-#include <sys\stat.h>
+//#include <sys\stat.h>
+#include <sys/stat.h>
 #include <sstream>
 #include <string>
 #include "file_io/file_io.h"
@@ -8,6 +9,11 @@
   #include <Windows.h>
 #endif
 #include "data_str/vector_managed.h"
+
+#if defined(GCC)
+#include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
+#endif
 
 namespace jtil {
 namespace file_io {
@@ -57,8 +63,36 @@ namespace file_io {
         hFind = INVALID_HANDLE_VALUE;
       }
     }
+#elif defined(GCC)
+
+    // Find the substring containing the base path and start iterating through files
+    std::string basePath = path.substr(0, path.rfind("/"));
+    boost::filesystem::path p(basePath);
+    if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
+    {
+      std::stringstream errss;
+      errss << "Error: " << basePath << " does not exist or is not a directory" << std::endl;
+      throw std::runtime_error(errss.str());
+    }
+
+    // Build the regex 
+    std::string expr(path.substr(path.rfind("/")+1));
+    //boost::regex r(expr), boost::regex::basic);
+    for (boost::filesystem::directory_iterator it(p); it!=boost::filesystem::directory_iterator(); ++it)
+    {
+      if (boost::filesystem::is_regular_file(it->status()) &&
+	  //boost::regex_match(it->path().filename().string(), r))
+	  !it->path().filename().string().compare(0, expr.size()-2, expr, 0, expr.size()-2))
+      {
+	char* filename_c_str = new char[it->path().filename().string().size()+1];
+	strcpy(filename_c_str, it->path().filename().string().c_str());
+	files.pushBack(filename_c_str);
+      }
+    }
+    
 #else
-    throw std::runtime_error("Not yet implemented for non Windows OS");
+    //throw std::runtime_error("Not yet implemented for non Windows OS");
+    throw std::runtime_error("Not yet implemented on current OS");
 #endif
   }
 

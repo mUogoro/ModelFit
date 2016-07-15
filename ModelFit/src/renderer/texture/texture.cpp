@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string>
 #include <sstream>
 #include "renderer/open_gl_common.h"

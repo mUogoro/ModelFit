@@ -1,5 +1,6 @@
 #include <sstream>
 #include <string>
+#include <stdexcept>
 #include "string_util/string_util.h"
 #include "renderer/open_gl_common.h"
 

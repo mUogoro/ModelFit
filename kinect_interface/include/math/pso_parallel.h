@@ -14,6 +14,7 @@
 #define NTILES (NTILES_DIM * NTILES_DIM)  // Total number of tiles
 
 #include <random>
+#include <cstring>
 #include "math/math_types.h"
 #include "math/common_optimization.h"
 #include "data_str/vector.h"

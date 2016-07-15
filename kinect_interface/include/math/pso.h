@@ -81,8 +81,12 @@ namespace math {
     SwarmNode<T>** swarm_;
 
     static MERSINE_TWISTER_ENG eng;
+#ifdef GCC
+    static std::uniform_real_distribution<T> dist_real;
+#else
     static std::tr1::uniform_real_distribution<T> dist_real;
-    
+#endif //GCC
+
     T interpolateCoeff(const T a, const T interp_val, 
       const T b, const T c, bool angle);
 

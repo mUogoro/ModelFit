@@ -12,11 +12,16 @@ using std::runtime_error;
 #define SAFE_DELETE(x) if (x != NULL) { delete x; x = NULL; }
 #define SAFE_DELETE_ARR(x) if (x != NULL) { delete[] x; x = NULL; }
 
+
 namespace jtil {
 namespace math {
 
   template <typename T> MERSINE_TWISTER_ENG PSO<T>::eng;
+#ifdef GCC
+  template <typename T> std::uniform_real_distribution<T> PSO<T>::dist_real(0, 1);
+#else
   template <typename T> std::tr1::uniform_real_distribution<T> PSO<T>::dist_real(0, 1);
+#endif // GCC
 
   template <typename T>
   PSO<T>::PSO(const uint32_t num_coeffs, const int swarm_size) {
@@ -95,7 +100,11 @@ namespace math {
 
     // Stochasticly sample for the other particles
     for (uint32_t j = 0; j < num_coeffs_; j++) {
+#ifdef GCC
+      std::uniform_real_distribution<T> c_dist(c_lo_[j], c_hi_[j]);
+#else
       std::tr1::uniform_real_distribution<T> c_dist(c_lo_[j], c_hi_[j]);
+#endif //GCC
       for (uint32_t i = 1; i < swarm_size_; i++) {
         T uniform_rand_num = c_dist(eng);  // [c_lo_, c_hi_)
         swarm_[i]->pos[j] = uniform_rand_num;
@@ -120,8 +129,13 @@ namespace math {
 
     // Initialize random velocity to Uniform(-2*radius_c, 2*radius_c)
     for (uint32_t j = 0; j < num_coeffs_; j++) {
+#ifdef GCC
+      std::uniform_real_distribution<T> c_dist(-2 * fabs(radius_c[j]),
+        2 * fabs(radius_c[j]));
+#else
       std::tr1::uniform_real_distribution<T> c_dist(-2 * fabs(radius_c[j]),
         2 * fabs(radius_c[j]));
+#endif // GCC
       for (uint32_t i = 0; i < swarm_size_; i++) {
         T uniform_rand_num = c_dist(eng);  // [-2*radius_c, 2*radius_c)
         swarm_[i]->vel[j] = uniform_rand_num;
