@@ -14,6 +14,7 @@
 #include "math/math_types.h"
 #include "data_str/vector.h"
 #include "data_str/pair.h"
+#include "kinect_interface_primesense/open_ni_funcs.h"
 
 #define CAL_GEOM_NUM_COEFF 6
 
@@ -70,7 +71,8 @@ namespace model_fit {
   class CalibrateGeometry : public PoseModel {
   public:
     // Constructor / Destructor
-    CalibrateGeometry(const CalibrateGeometryType type);
+    CalibrateGeometry(const CalibrateGeometryType type,
+		      const kinect_interface_primesense::OpenNIFuncs &openNIFuncs);
     virtual ~CalibrateGeometry();
 
     // Call before rendering hand depth maps:
@@ -122,6 +124,11 @@ namespace model_fit {
 
   private:
     CalibrateGeometryType type_;
+
+    // Moved from global define in open_ni_funcs.h to private members
+    uint32_t src_width;
+    uint32_t src_height;
+    uint32_t src_dim;
 
     // This is a waste to have all the pointers even if they aren't used...
     // but this is just throwaway code so it's OK.

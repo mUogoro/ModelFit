@@ -45,7 +45,16 @@ using namespace renderer;
 
 namespace model_fit {
   
-  ModelRenderer::ModelRenderer(const uint32_t num_cameras) {
+  ModelRenderer::ModelRenderer(const uint32_t num_cameras,
+			       const kinect_interface_primesense::OpenNIFuncs &openNIFuncs) {
+
+    float fov_vert_deg = 360.0f * openNIFuncs.getVFOV() / 
+      (2.0f * (float)M_PI);
+    src_width = openNIFuncs.getNXRes();
+    src_height = openNIFuncs.getNYRes();
+    src_dim = src_width*src_height;
+
+
     num_cameras_ = num_cameras;
     depth_tmp_ = new float*[num_cameras_];
     for (uint32_t i = 0; i < num_cameras_; i++) {
@@ -53,8 +62,9 @@ namespace model_fit {
     }
     FloatQuat eye_rot; eye_rot.identity();
     Float3 eye_pos(0, 0, 0);
-    float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
-      (2.0f * (float)M_PI);
+    //float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
+    //  (2.0f * (float)M_PI);
+    
     cameras_ = new Camera*[num_cameras_];
     for (uint32_t i = 0; i < num_cameras_; i++) {
       cameras_[i] = new Camera(&eye_rot, &eye_pos, src_width, src_height, 
@@ -184,6 +194,8 @@ namespace model_fit {
       src_width/2, src_height/2, RESIDUE_FORMAT, RESIDUE_TYPE, 1, false);
     residue_texture_4_ = new TextureRenderable(RESIDUE_INT_FORMAT, 
       src_width/4, src_height/4, RESIDUE_FORMAT, RESIDUE_TYPE, 1, false);
+    residue_texture_8_ = new TextureRenderable(RESIDUE_INT_FORMAT, 
+      src_width/8, src_height/8, RESIDUE_FORMAT, RESIDUE_TYPE, 1, false);
     residue_texture_16_ = new TextureRenderable(RESIDUE_INT_FORMAT, 
       src_width/16, src_height/16, RESIDUE_FORMAT, RESIDUE_TYPE, 1, false);
     residue_texture_20_ = new TextureRenderable(RESIDUE_INT_FORMAT, 
@@ -236,6 +248,7 @@ namespace model_fit {
     SAFE_DELETE(residue_texture_1_);
     SAFE_DELETE(residue_texture_2_);
     SAFE_DELETE(residue_texture_4_);
+    SAFE_DELETE(residue_texture_8_);
     SAFE_DELETE(residue_texture_16_);
     SAFE_DELETE(residue_texture_20_);
     SAFE_DELETE(residue_texture_32_);
@@ -500,6 +513,38 @@ namespace model_fit {
 
     residue_texture_1_->end();
 
+    // Note: the original code suppose a 640x480 input depth. It does not work with
+    // arbitrary width and height. Downsample to just 1./8 and perform the rest of the
+    // integration on the CPU
+    // TODO: provide a more performant/elegant/generic solution
+    g_renderer_->downsample4IntegTexture(residue_texture_4_, residue_texture_1_);
+    g_renderer_->downsample2IntegTexture(residue_texture_8_, residue_texture_4_);
+    
+    // Now we need to finish the rest of the integration on the CPU since the 
+    // resolution is now 4 x 3
+    residue_texture_8_->getTexture0Data<float>(depth_tmp_[i_camera]);
+
+#ifdef DEPTH_ONLY_RESIDUE_FUNC
+    float depth_integral = 0.0f;  // Integral(abs(d_kin - d_syn))
+    float o_s_union_r_s = UNION;  // union of kinect and depth pixels
+    float o_s_intersect_r_s = 0.0f;  // intersection of kinect and depth pixels
+    const int decimation = 4 * 2;
+    for (uint32_t i = 0; i < src_dim / (decimation*decimation); i++) {
+      depth_integral += depth_tmp_[i_camera][i];
+    }
+#else
+    float depth_integral = 0.0f;  // Integral(abs(d_kin - d_syn))
+    float o_s_union_r_s = 0.0f;  // union of kinect and depth pixels
+    float o_s_intersect_r_s = 0.0f;  // intersection of kinect and depth pixels
+    const int decimation = 4 * 2;
+    for (uint32_t i = 0; i < src_dim / (decimation*decimation); i++) {
+      depth_integral += depth_tmp_[i_camera][i*3];
+      o_s_union_r_s += depth_tmp_[i_camera][i*3+1];
+      o_s_intersect_r_s += depth_tmp_[i_camera][i*3+2];
+    }
+#endif
+
+    /*
     // Now downsample and integrate to 1/160 the size in each dimension
     g_renderer_->downsample4IntegTexture(residue_texture_4_, residue_texture_1_);
     g_renderer_->downsample4IntegTexture(residue_texture_16_, residue_texture_4_);
@@ -529,6 +574,7 @@ namespace model_fit {
       o_s_intersect_r_s += depth_tmp_[i*3+2];
     }
 #endif
+    */
 
     // Finally, calculate the objective function value
     static float lambda = DATA_TERM_LAMBDA;
@@ -568,6 +614,54 @@ namespace model_fit {
 
     residue_texture_x8_->end();
 
+    // As in function calculateResidualDataTerm, the original code suppose a 640x480
+    // input depth. It does not work with arbitrary width and height. Downsample
+    // to just 1/ and perform the rest of the integration on the CPU
+    // (8x8 tiles of 16*13)
+    // TODO: provide a more performant/elegant/generic solution
+    g_renderer_->downsample4IntegTexture(residue_texture_x2_, residue_texture_x8_); 
+    g_renderer_->downsample2IntegTexture(residue_texture_1_, residue_texture_x2_);  
+
+    // Now we need to finish the rest of the integration on the CPU since the 
+    // tile resolution is now 4 x 3
+    residue_texture_1_->getTexture0Data<float>(depth_tmp_[i_camera]);
+
+    const int decimation = 4 * 2;
+    static float lambda = DATA_TERM_LAMBDA;
+
+    for (uint32_t tile_v = 0; tile_v < NTILES_Y; tile_v++) {
+      uint32_t v_off = tile_v * (src_height / decimation);
+      for (uint32_t tile_u = 0; tile_u < NTILES_X; tile_u++) {
+        if (tile_v*NTILES_X + tile_u < residues.size()) {
+          uint32_t u_off = tile_u * (src_width / decimation);
+
+#ifdef DEPTH_ONLY_RESIDUE_FUNC
+          float depth_integral = 0.0f;  // Integral(abs(d_kin - d_syn))
+          float o_s_union_r_s = UNION;  // union of kinect and depth pixels
+          float o_s_intersect_r_s = 0.0f;  // intersection of kinect and depth pixels
+
+          for (uint32_t v = 0; v < (src_height / decimation); v++) {
+            for (uint32_t u = 0; u < (src_width / decimation); u++) {
+              uint32_t i = (v_off + v) * ((NTILES_X * src_width) / decimation) + u_off + u;
+              depth_integral += depth_tmp_[i_camera][i];
+            }
+          }
+#else
+          float depth_integral = 0.0f;  // Integral(abs(d_kin - d_syn))
+          float o_s_union_r_s = 0.0f;  // union of kinect and depth pixels
+          float o_s_intersect_r_s = 0.0f;  // intersection of kinect and depth pixels
+
+          for (uint32_t v = 0; v < (src_height / decimation); v++) {
+            for (uint32_t u = 0; u < (src_width / decimation); u++) {
+              uint32_t i = (v_off + v) * ((NTILES_X * src_width) / decimation) + u_off + u;
+              depth_integral += depth_tmp_[i_camera][i*3];
+              o_s_union_r_s += depth_tmp_[i_camera][i*3+1];
+              o_s_intersect_r_s += depth_tmp_[i_camera][i*3+2];
+            }
+          }
+#endif
+
+    /*
     // 5120 x 3840 -> 1280 x 960 (tiles of 160 x 120)
     g_renderer_->downsample4IntegTexture(residue_texture_x2_, residue_texture_x8_); 
 
@@ -616,6 +710,8 @@ namespace model_fit {
             }
           }
 #endif
+	  */
+
 #ifdef DEPTH_ONLY_RESIDUE_FUNC
           float data_term = lambda * (depth_integral / (o_s_union_r_s + EPSILON));
 #else

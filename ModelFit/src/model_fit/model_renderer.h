@@ -16,6 +16,7 @@
 #include "math/math_types.h"
 #include "data_str/pair.h"
 #include "data_str/vector.h"
+#include "kinect_interface_primesense/open_ni_funcs.h"
 
 #define DEPTH_ONLY_RESIDUE_FUNC  // Faster but less accurate
 #define EQUAL_CAMERA_IMPORTANCE  // Otherwise Residual = d / (i_cam + 1)
@@ -50,7 +51,8 @@ namespace model_fit {
   class ModelRenderer {
   public:
     // Constructor / Destructor
-    ModelRenderer(const uint32_t num_cameras);
+    ModelRenderer(const uint32_t num_cameras,
+		  const kinect_interface_primesense::OpenNIFuncs &openNIFuncs);
     ~ModelRenderer();
 
     // Call before rendering depth maps:
@@ -90,11 +92,17 @@ namespace model_fit {
     uint32_t num_cameras_;
     renderer::Camera** cameras_;
     
+    // Moved from global define in open_ni_funcs.h to private members
+    uint32_t src_width;
+    uint32_t src_height;
+    uint32_t src_dim;
+
     renderer::TextureRenderable* depth_texture_;  // 640 x 480
     renderer::TextureRenderable* depth_texture_tiled_;  // 5120 x 3840 (8x8)
     renderer::TextureRenderable* residue_texture_1_;   // 640 x 480
     renderer::TextureRenderable* residue_texture_2_;   // 320 x 240
     renderer::TextureRenderable* residue_texture_4_;   // 160 x 120
+    renderer::TextureRenderable* residue_texture_8_;   // 80 x 60
     renderer::TextureRenderable* residue_texture_16_;  // 40 x 30
     renderer::TextureRenderable* residue_texture_20_;  // 32 x 24
     renderer::TextureRenderable* residue_texture_32_;  // 20 x 15

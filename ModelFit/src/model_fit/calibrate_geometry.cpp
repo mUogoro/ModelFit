@@ -40,7 +40,12 @@ namespace model_fit {
   jtil::math::Float3 CalibrateGeometry::vmodel_[3];
   uint32_t CalibrateGeometry::num_frames_;
 
-  CalibrateGeometry::CalibrateGeometry(const CalibrateGeometryType type) {
+  CalibrateGeometry::CalibrateGeometry(const CalibrateGeometryType type,
+				       const kinect_interface_primesense::OpenNIFuncs &openNIFuncs) {
+    src_width = openNIFuncs.getNXRes();
+    src_height = openNIFuncs.getNYRes();
+    src_dim = src_width*src_height;
+
     type_ = type;
     scene_graph_ = new Geometry();
 

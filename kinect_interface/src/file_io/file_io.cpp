@@ -13,6 +13,7 @@
 #if defined(GCC)
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
+#include <vector>
 #endif
 
 namespace jtil {
@@ -66,6 +67,7 @@ namespace file_io {
 #elif defined(GCC)
 
     // Find the substring containing the base path and start iterating through files
+    std::vector<std::string> _files;
     std::string basePath = path.substr(0, path.rfind("/"));
     boost::filesystem::path p(basePath);
     if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
@@ -84,10 +86,19 @@ namespace file_io {
 	  //boost::regex_match(it->path().filename().string(), r))
 	  !it->path().filename().string().compare(0, expr.size()-2, expr, 0, expr.size()-2))
       {
-	char* filename_c_str = new char[it->path().filename().string().size()+1];
-	strcpy(filename_c_str, it->path().filename().string().c_str());
-	files.pushBack(filename_c_str);
+	//char* filename_c_str = new char[it->path().filename().string().size()+1];
+	//strcpy(filename_c_str, it->path().filename().string().c_str());
+	//files.pushBack(filename_c_str);
+	_files.push_back(it->path().filename().string());
       }
+    }
+    
+    std::sort(_files.begin(), _files.end());
+    for (std::vector<std::string>::iterator it=_files.begin(); it!=_files.end(); ++it)
+    {
+      char* filename_c_str = new char[it->size()+1];
+      strcpy(filename_c_str, it->c_str());
+      files.pushBack(filename_c_str);
     }
     
 #else

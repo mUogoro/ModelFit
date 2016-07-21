@@ -12,7 +12,8 @@
 #include "renderer/gl_state.h"
 #include "renderer/camera/camera.h"
 #include "renderer/texture/texture_renderable.h"
-#include "kinect_interface_primesense/kinect_interface_primesense.h"  // for src_dim
+//#include "kinect_interface_primesense/kinect_interface_primesense.h"  // for src_dim
+
 
 #define SAFE_DELETE(x) if (x != NULL) { delete x; x = NULL; }
 #define SAFE_DELETE_ARR(x) if (x != NULL) { delete[] x; x = NULL; }
@@ -33,10 +34,15 @@ namespace model_fit {
   uint64_t ModelFit::func_eval_count_ = 0;
  
   ModelFit::ModelFit(const uint32_t num_models, 
-    const uint32_t coeff_dim_per_model, const uint32_t num_cameras) {
+    const uint32_t coeff_dim_per_model, const uint32_t num_cameras,
+    const kinect_interface_primesense::OpenNIFuncs &openNIFuncs) {
     if (num_models == 0 || coeff_dim_per_model == 0) {
       throw std::runtime_error("ModelFit::ModelFit() - ERROR: check inputs!");
     }
+
+    src_width = openNIFuncs.getNXRes();
+    src_height = openNIFuncs.getNYRes();
+    src_dim = src_width*src_height;
 
     save_next_image_set_ = false;
     num_cameras_ = num_cameras;
@@ -54,7 +60,7 @@ namespace model_fit {
 
     kinect_depth_masked_ = new int16_t[src_dim];
 
-    model_renderer_ = new ModelRenderer(num_cameras_);
+    model_renderer_ = new ModelRenderer(num_cameras_, openNIFuncs);
   }
 
   ModelFit::~ModelFit() {

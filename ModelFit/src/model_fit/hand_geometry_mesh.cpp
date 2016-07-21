@@ -40,7 +40,13 @@ namespace model_fit {
   float HandGeometryMesh::cur_scale_ = 1.0f;
   float HandGeometryMesh::cur_lengths_[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
   
-  HandGeometryMesh::HandGeometryMesh(HandType hand_type) {
+  HandGeometryMesh::HandGeometryMesh(HandType hand_type,
+    const kinect_interface_primesense::OpenNIFuncs &openNIFuncs) {
+
+    src_width = openNIFuncs.getNXRes();
+    src_height = openNIFuncs.getNYRes();
+    src_dim = src_width*src_height;
+
     // Set all the bones to undefined:
     bone_wrist_index_ = MAX_UINT32;
     bone_palm_index_ = MAX_UINT32;

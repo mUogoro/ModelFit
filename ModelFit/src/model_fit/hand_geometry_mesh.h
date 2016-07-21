@@ -16,6 +16,7 @@
 #include "math/math_types.h"
 #include "data_str/vector.h"
 #include "data_str/pair.h"
+#include "kinect_interface_primesense/open_ni_funcs.h"
 
 #if defined(__APPLE__)
   #define HAND_MODEL_PATH string("./../../../../../../../../../models/")
@@ -23,7 +24,7 @@
   #define HAND_MODEL_PATH string("./models/")
 #endif
 
-#define LOAD_HAND_MESH_JFILE  // Much faster and more compact format!
+//#define LOAD_HAND_MESH_JFILE  // Much faster and more compact format!
 #define LHAND_MODEL_FILE "hand_palm_parent_medium_wrist.dae"
 #define LHAND_MODEL_JFILE "hand_palm_parent_medium_wrist.jbin"
 #define RHAND_MODEL_FILE "hand_palm_parent_medium_wrist_right.dae"
@@ -49,7 +50,8 @@ namespace model_fit {
   class HandGeometryMesh : public PoseModel {
   public:
     // Constructor / Destructor
-    HandGeometryMesh(kinect_interface_primesense::hand_net::HandType hand_type);
+    HandGeometryMesh(kinect_interface_primesense::hand_net::HandType hand_type,
+		     const kinect_interface_primesense::OpenNIFuncs &openNIFuncs);
     virtual ~HandGeometryMesh();
 
     // Call before rendering hand depth maps:
@@ -95,6 +97,11 @@ namespace model_fit {
     virtual const uint32_t max_bsphere_groups() { return kinect_interface_primesense::hand_net::HandModel::max_bsphere_groups(); }
 
   private:
+    // Moved from global define in open_ni_funcs.h to private members
+    uint32_t src_width;
+    uint32_t src_height;
+    uint32_t src_dim;
+
     // Note all geometry is attached to the global renderer's scene graph and
     // therefore we transfer ownership of the memory to it.
     renderer::Geometry* scene_graph_;  // The renderable geometry - Not owned here

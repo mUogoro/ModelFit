@@ -25,6 +25,7 @@
 #include "data_str/vector.h"
 #include "math/common_optimization.h"  // For CoeffUpdateFuncPtr
 #include "math/pso_parallel.h"
+#include "kinect_interface_primesense/open_ni_funcs.h"
 
 #define NTILES_DEFAULT NTILES
 #define NTILES_X NTILES_DIM
@@ -54,7 +55,8 @@ namespace model_fit {
     friend class jtil::math::PSOParallel;
     // Constructor / Destructor
     ModelFit(const uint32_t num_models, const uint32_t coeff_dim_per_model, 
-      const uint32_t num_cameras);
+      const uint32_t num_cameras,
+      const kinect_interface_primesense::OpenNIFuncs &openNIFuncs);
     ~ModelFit();
 
     // fitModel - Top function:
@@ -78,6 +80,12 @@ namespace model_fit {
       jtil::math::Float4x4& view_ret);
 
   private:
+
+    // Moved from global define in open_ni_funcs.h to private members
+    uint32_t src_width;
+    uint32_t src_height;
+    uint32_t src_dim;
+
     uint32_t coeff_dim_; 
     uint32_t coeff_dim_per_model_;
     uint32_t num_models_;

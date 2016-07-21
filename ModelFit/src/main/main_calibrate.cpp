@@ -134,18 +134,32 @@ float** coeff = NULL;  // Temp space only used when performing fit
 float** prev_coeff = NULL; 
 
 // Kinect Image data 
+//OpenNIFuncs openni_funcs;
+OpenNIFuncs openni_funcs(512, 424, 70./180.*M_PI, 60/180.*M_PI, 0);
+uint32_t src_width = openni_funcs.getNXRes();
+uint32_t src_height = openni_funcs.getNYRes();
+uint32_t src_dim = src_width * src_height;
+/*
 float cur_xyz_data[max_kinects][src_dim*3];
 float cur_norm_data[max_kinects][src_dim*3];
 float cur_uvd_data[max_kinects][src_dim*3];
 int16_t cur_depth_data[max_kinects][src_dim*3];
 uint8_t cur_label_data[max_kinects][src_dim];
 uint8_t cur_image_rgb[max_kinects][src_dim*3];
+*/
+float *cur_xyz_data[max_kinects];
+float *cur_norm_data[max_kinects];
+float *cur_uvd_data[max_kinects];
+int16_t *cur_depth_data[max_kinects];
+uint8_t *cur_label_data[max_kinects];
+uint8_t *cur_image_rgb[max_kinects];
+
 uint32_t cur_image = 0;
 GeometryColoredPoints* geometry_points[max_kinects];
 GeometryColoredLines* geometry_lines[max_kinects-1];  // For displaying ICP correspondances
-OpenNIFuncs openni_funcs;
 Texture* tex = NULL;
-uint8_t tex_data[src_dim * 3];
+//uint8_t tex_data[src_dim * 3];
+uint8_t *tex_data;
 const bool color_point_clouds = false;
 const float point_cloud_scale = 4.0f;
 const uint32_t num_point_clouds_to_render = 1;
@@ -161,6 +175,32 @@ using namespace jtil::file_io;
 using std::endl;
 jtil::math::Float4x4 mat_tmp;
 WindowSettings settings;
+
+void initData(){
+  for (int i=0; i<max_kinects; i++)
+  {
+    cur_xyz_data[i] = new float[src_dim*3];
+    cur_norm_data[i] = new float[src_dim*3];
+    cur_uvd_data[i] = new float[src_dim*3];
+    cur_depth_data[i] = new int16_t[src_dim*3];
+    cur_label_data[i] = new uint8_t[src_dim];
+    cur_image_rgb[i] = new uint8_t[src_dim*3];
+  }
+  tex_data = new uint8_t[src_dim*3];
+}
+
+void cleanData(){
+  for (int i=0; i<max_kinects; i++)
+  {
+    delete []cur_xyz_data[i];
+    delete []cur_norm_data[i];
+    delete []cur_uvd_data[i];
+    delete []cur_depth_data[i];
+    delete []cur_label_data[i];
+    delete []cur_image_rgb[i];
+  }
+  delete []tex_data;
+}
 
 void quit() {
   tp->stop();
@@ -676,6 +716,25 @@ void KeyboardCB(int key, int scancode, int action, int mods) {
         SaveArrayToFile<float>(camera_view[k_src].m, 16, ss.str());
         std::cout << "Calibration data saved to " << ss.str() << endl;
         last_icp_kinect = k_src;
+
+	// TODO: delete
+	// print save coefficients	
+	std::cout << camera_view[k_src](0,0) << " "
+		  << camera_view[k_src](0,1) << " "
+		  << camera_view[k_src](0,2) << " "
+		  << camera_view[k_src](0,3) << std::endl
+		  << camera_view[k_src](1,0) << " "
+		  << camera_view[k_src](1,1) << " "
+		  << camera_view[k_src](1,2) << " "
+		  << camera_view[k_src](1,3) << std::endl 
+		  << camera_view[k_src](2,0) << " "
+		  << camera_view[k_src](2,1) << " "
+		  << camera_view[k_src](2,2) << " "
+		  << camera_view[k_src](2,3) << std::endl 
+		  << camera_view[k_src](3,0) << " "
+		  << camera_view[k_src](3,1) << " "
+		  << camera_view[k_src](3,2) << " "
+		  << camera_view[k_src](3,3) << std::endl;
       }
       break;
     case static_cast<int>('v'):
@@ -818,6 +877,8 @@ int main(int argc, char *argv[]) {
   //_CrtSetBreakAlloc(3022);
 #endif
 
+  initData();
+
   cout << "Usage:" << endl;
   cout << "WSADQE - Move camera" << endl;
   cout << "shift - Sprint" << endl;
@@ -843,7 +904,7 @@ int main(int argc, char *argv[]) {
   cout << "i - Change the current kinect (for ICP to move onto dst)" << endl;
   cout << "I - Change the current dst kinect" << endl << endl;
   
-  try {
+  //try {
     tp = new ThreadPool(num_worker_threads);
 
     clk = new jtil::clk::Clk();
@@ -874,7 +935,9 @@ int main(int argc, char *argv[]) {
     Float3 eye_pos(0, 0, 0);
     render = new Renderer();
     render->background_color.set(0.098f, 0.098f, 0.3922f, 1.0f);
-    float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
+    //float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
+    //  (2.0f * (float)M_PI);
+    float fov_vert_deg = 360.0f * openni_funcs.getVFOV() / 
       (2.0f * (float)M_PI);
     render->init(eye_rot, eye_pos, settings.width, settings.height,
       -HAND_MODEL_CAMERA_VIEW_PLANE_NEAR, -HAND_MODEL_CAMERA_VIEW_PLANE_FAR, 
@@ -971,10 +1034,10 @@ int main(int argc, char *argv[]) {
     coeff = new float*[num_models];
     prev_coeff = new float*[num_models];
     models = new PoseModel*[num_models];
-    models[0] = new CalibrateGeometry(cal_type);
+    models[0] = new CalibrateGeometry(cal_type, openni_funcs);
 
     // Create the optimizer that will fit the models
-    fit = new ModelFit(num_models, num_coeff_fit, num_model_fit_cameras);
+    fit = new ModelFit(num_models, num_coeff_fit, num_model_fit_cameras, openni_funcs);
 
     // Load the coeffs from file (if they exist)
     float calb_data[max_kinects * num_coeff];
@@ -1052,10 +1115,14 @@ int main(int argc, char *argv[]) {
       // let someone else do some work
       std::this_thread::yield();
     }
+  /*
   } catch (std::runtime_error e) {
     printf("%s\n", e.what());
     system("PAUSE");
   }
+  */
   
+    cleanData();
+
   return 0;
 }

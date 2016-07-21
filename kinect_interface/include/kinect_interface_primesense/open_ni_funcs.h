@@ -14,7 +14,7 @@
 namespace kinect_interface_primesense {
   struct CalibrationData;
   
-  class OpenNIFuncs {
+  class OpenNIFuncs{
   public:
     // Top level interface
     
@@ -25,6 +25,12 @@ namespace kinect_interface_primesense {
       const float hFOV, const float vFOV, const uint32_t internal_dev_id);
     OpenNIFuncs();  // The default is for the primesense 1.09
     ~OpenNIFuncs();
+
+    uint32_t getNXRes() const {return nXRes_;};
+    uint32_t getNYRes() const {return nYRes_;};
+    float getHFOV() const {return fHFOV_;};
+    float getVFOV() const {return fVFOV_;};
+
 
     // This is for the new Primesense 1.09 sensor
     void convertDepthToWorldCoordinates(const float* uvd, float* xyz, 
@@ -49,6 +55,19 @@ namespace kinect_interface_primesense {
       float* aProjective);
     
     // Primesense 1.09 constants
+    // Move to private in order to avoid hardcoding of RGBD camera parameters in the
+    // rest of the code
+    /*
+    void update109Constants();
+
+    static const float fHFOV_primesense_109;
+    static const float fVFOV_primesense_109;
+    static const uint32_t nXRes_primesense_109;
+    static const uint32_t nYRes_primesense_109;
+    */
+
+  private:
+
     void update109Constants();
 
     static const float fHFOV_primesense_109;
@@ -56,7 +75,6 @@ namespace kinect_interface_primesense {
     static const uint32_t nXRes_primesense_109;
     static const uint32_t nYRes_primesense_109;
 
-  private:
     // Kinect constants
     static const double m_fRealWorldXtoZ_kinect_;
 		static const double m_fRealWorldYtoZ_kinect_;

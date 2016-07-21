@@ -14,9 +14,13 @@
 #include "data_str/vector_managed.h"
 #include "data_str/vector.h"
 
+
+// NOTE: Avoid global width and height
+/*
 #define src_width 640
 #define src_height 480
 #define src_dim (src_width * src_height)
+*/
 
 #define SKEL_NJOINTS 25
 #define SKELETON_SMOOTHING 0.05f

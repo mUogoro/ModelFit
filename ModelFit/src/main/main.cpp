@@ -54,7 +54,8 @@
 #define SAFE_DELETE(x) if (x != NULL) { delete x; x = NULL; }
 #define SAFE_DELETE_ARR(x) if (x != NULL) { delete[] x; x = NULL; }
 
-static const int max_kinects = 3;
+//static const int max_kinects = 3;
+static const int max_kinects = 1;
 static const int num_worker_threads = 6;
 static const char calib_im_dir[] = "../data/calib/";
 static const char im_dir[] = "../data/hand_data/";
@@ -120,24 +121,38 @@ uint32_t coeff_src = 0;
 float** coeff = NULL;  // Temp space only used when performing fit
 float** prev_coeff = NULL; 
 
+// Openni functions
+//OpenNIFuncs openni_funcs;
+OpenNIFuncs openni_funcs(512, 424, 70./180.*M_PI, 60/180.*M_PI, 0);
+uint32_t src_width = openni_funcs.getNXRes();
+uint32_t src_height = openni_funcs.getNYRes();
+uint32_t src_dim = src_width * src_height;
+
+
 // Kinect Image data 
 jtil::data_str::VectorManaged<char*> depth_files[max_kinects];  // [kinect][frame]
 jtil::data_str::VectorManaged<char*> rgb_files[max_kinects];  
-float cur_xyz_data[max_kinects][src_dim*3];
-float cur_norm_data[max_kinects][src_dim*3];
-float cur_uvd_data[max_kinects][src_dim*3];
+//float cur_xyz_data[max_kinects][src_dim*3];
+//float cur_norm_data[max_kinects][src_dim*3];
+//float cur_uvd_data[max_kinects][src_dim*3];
+float *cur_xyz_data[max_kinects];
+float *cur_norm_data[max_kinects];
+float *cur_uvd_data[max_kinects];
 int16_t** cur_depth_data;  // Size: [max_kinects][src_dim*3]
 uint8_t** cur_label_data;  // Size: [max_kinects][src_dim]
-uint8_t cur_image_rgb[max_kinects][src_dim*3];
+//uint8_t cur_image_rgb[max_kinects][src_dim*3];
+uint8_t *cur_image_rgb[max_kinects];
 uint32_t cur_image = 0;
 GeometryColoredPoints* geometry_points[max_kinects];
-float temp_xyz[3 * src_dim];
-float temp_rgb[3 * src_dim];
+//float temp_xyz[3 * src_dim];
+//float temp_rgb[3 * src_dim];
+float *temp_xyz;
+float *temp_rgb;
 bool render_depth = true;
 int playback_step = 1;
-OpenNIFuncs openni_funcs;
 Texture* tex = NULL;
-uint8_t tex_data[src_dim * 3];
+//uint8_t tex_data[src_dim * 3];
+uint8_t *tex_data;
 const bool color_point_clouds = false;
 const float point_cloud_scale = 4.0f;
 
@@ -148,6 +163,32 @@ using std::cout;
 using std::endl;
 jtil::math::Float4x4 mat_tmp;
 WindowSettings settings;
+
+void initData(){
+  for (int i=0; i<max_kinects; i++)
+  {
+    cur_xyz_data[i] = new float[src_dim*3];
+    cur_norm_data[i] = new float[src_dim*3];
+    cur_uvd_data[i] = new float[src_dim*3];
+    cur_image_rgb[i] = new uint8_t[src_dim*3];
+  }
+  temp_xyz = new float[src_dim*3];
+  temp_rgb = new float[src_dim*3];
+  tex_data = new uint8_t[src_dim * 3];
+}
+
+void cleanData(){
+  for (int i=0; i<max_kinects; i++)
+  {
+    delete []cur_xyz_data[i];
+    delete []cur_norm_data[i];
+    delete []cur_uvd_data[i];
+    delete []cur_image_rgb[i];
+  }
+  delete []temp_xyz;
+  delete []temp_rgb;
+  delete []tex_data;
+}
 
 void quit() {
   tp->stop();
@@ -790,6 +831,8 @@ int main(int argc, char *argv[]) {
   // _CrtSetBreakAlloc(2997);
 #endif
 
+  initData();
+
   cout << "Usage:" << endl;
   cout << "WSADQE - Move camera" << endl;
   cout << "shift - Sprint" << endl;
@@ -815,7 +858,7 @@ int main(int argc, char *argv[]) {
   cout << "k - change the current kinect (render only)" << endl;
   cout << "shift+12345 - Copy finger1234/thumb from last frame" << endl;
   
-  try {
+  //try {
     tp = new ThreadPool(num_worker_threads);
 
     clk = new jtil::clk::Clk();
@@ -846,7 +889,9 @@ int main(int argc, char *argv[]) {
     Float3 eye_pos(0, 0, 0);
     render = new Renderer();
     render->background_color.set(0.098f, 0.098f, 0.3922f, 1.0f);
-    float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
+    //float fov_vert_deg = 360.0f * OpenNIFuncs::fVFOV_primesense_109 / 
+    //  (2.0f * (float)M_PI);
+    float fov_vert_deg = 360.0f * openni_funcs.getVFOV() / 
       (2.0f * (float)M_PI);
     render->init(eye_rot, eye_pos, settings.width, settings.height,
       -HAND_MODEL_CAMERA_VIEW_PLANE_NEAR, -HAND_MODEL_CAMERA_VIEW_PLANE_FAR, 
@@ -901,16 +946,16 @@ int main(int argc, char *argv[]) {
     models = new PoseModel*[num_models];
 
     if (fit_left && fit_right) {
-      models[0] = new HandGeometryMesh(LEFT);
-      models[1] = new HandGeometryMesh(RIGHT);
+      models[0] = new HandGeometryMesh(LEFT, openni_funcs);
+      models[1] = new HandGeometryMesh(RIGHT, openni_funcs);
     } else if (fit_left) {
-      models[0] = new HandGeometryMesh(LEFT);
+      models[0] = new HandGeometryMesh(LEFT, openni_funcs);
     } else if (fit_right) {
-      models[0] = new HandGeometryMesh(RIGHT);
+      models[0] = new HandGeometryMesh(RIGHT, openni_funcs);
     }
 
     // Create the optimizer that will fit the models
-    fit = new ModelFit(num_models, num_coeff_fit, max_kinects);
+    fit = new ModelFit(num_models, num_coeff_fit, max_kinects, openni_funcs);
 
     Float4x4 old_view, cur_view, camera_view_inv;
     for (uint32_t k = 0; k < max_kinects; k++) {
@@ -981,12 +1026,16 @@ int main(int argc, char *argv[]) {
       // let someone else do some work
       std::this_thread::yield();
     }
+  /*
   } catch (std::runtime_error e) {
     printf("%s\n", e.what());
 #if defined(WIN32) || defined(_WIN32)
     system("PAUSE");
 #endif
   }
+  */
   
+  cleanData();
+
   return 0;
 }
